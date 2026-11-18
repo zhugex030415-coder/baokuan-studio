@@ -173,7 +173,7 @@ const STYLE_INFO={
 };
 const EXAMPLE="家长说给孩子报了一年两万的英语班，成绩没变化，怀疑被割了韭菜";
 let curTheme="全部", LIB=[], mode="原创";
-const selected=new Set(Object.keys(STYLE_INFO));
+const selected=new Set(["干货型"]);
 
 function goRadar(){document.querySelector('nav button[data-s="radar"]').click();}
 function setMode(m){
@@ -194,7 +194,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   const box=$("styles");
   Object.entries(STYLE_INFO).forEach(([s,desc])=>{
     const d=document.createElement("div");
-    d.className="scard sel";
+    d.className="scard"+(selected.has(s)?" sel":"");
     d.innerHTML=`<div class="sname">${s}</div><div class="sdesc">${desc}</div>`;
     d.onclick=()=>{selected.has(s)?selected.delete(s):selected.add(s);d.classList.toggle("sel");};
     box.appendChild(d);
