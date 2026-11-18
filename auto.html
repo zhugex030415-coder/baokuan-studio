@@ -164,11 +164,12 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const mdBold=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const STYLE_INFO={
+  "干货型":"⭐ 易出爆款 · 给一套能照着做的方法",
+  "故事型":"讲一个学生的真实转变，靠共鸣",
   "立场型":"说句家长不爱听的，直接点破",
   "反讽型":"把槽点尖刻地拆穿",
   "共情型":"先安抚再讲道理",
   "短打型":"60秒口播稿，发视频号",
-  "干货型":"给一个能照着做的方法",
 };
 const EXAMPLE="家长说给孩子报了一年两万的英语班，成绩没变化，怀疑被割了韭菜";
 let curTheme="全部", LIB=[], mode="原创";
