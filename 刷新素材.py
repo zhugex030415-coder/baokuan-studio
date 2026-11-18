@@ -24,6 +24,11 @@ KEY = CONFIG.get("key", "")
 API = CONFIG.get("api", "https://api.deepseek.com/chat/completions")
 MODEL = CONFIG.get("model", "deepseek-chat")
 
+# 只保留 2025-10-01 之后发布的笔记（本地时区）
+CUTOFF_TS = datetime.datetime(2025, 10, 1).timestamp()
+CUTOFF_STR = "2025-10-01"
+MIN_LIKES = 20
+
 BOARDS = [
     ("原版教材·考试", ["KET", "PET", "Power Up 教材", "Think 教材", "原版教材",
                        "自然拼读", "Reading Explorer", "剑桥英语"]),
@@ -59,14 +64,16 @@ def norm(t):
     return s
 
 
-def crawl(kw):
+def crawl(kws):
+    """一次浏览器里抓多个关键词（逗号分隔），避免反复开浏览器。"""
+    kw = kws if isinstance(kws, str) else ",".join(kws)
     cmd = [str(PY), "main.py", "--platform", "xhs", "--type", "search",
-           "--keywords", kw, "--crawler_max_notes_count", "15",
+           "--keywords", kw, "--crawler_max_notes_count", "20",
            "--get_comment", "false", "--save_data_option", "jsonl"]
     try:
-        subprocess.run(cmd, cwd=str(MC), capture_output=True, timeout=300)
+        subprocess.run(cmd, cwd=str(MC), capture_output=True, timeout=600)
     except Exception as e:
-        print(f"  [warn] {kw} 失败：{e}")
+        print(f"  [warn] 抓取失败：{e}")
 
 
 def load_rows():
@@ -139,6 +146,8 @@ def load_library():
 
 def build_and_append(rows, kw2board, do_crawl_log=True):
     lib = load_library()
+    # 只保留 2025-10 之后的历史，老的一律清掉
+    lib = [i for i in lib if str(i.get("first_seen", "") or "") >= CUTOFF_STR]
     seen = {norm(i.get("title")) for i in lib}
     new = []
     for r in rows:
@@ -152,10 +161,12 @@ def build_and_append(rows, kw2board, do_crawl_log=True):
         nk = norm(t)
         if not nk or nk in seen:
             continue
-        likes = parse_num(r.get("liked_count"))
-        if likes < 150:
-            continue
         ts = r.get("time") or 0
+        if ts and ts / 1000 < CUTOFF_TS:
+            continue   # 2025-10 之前的跳过
+        likes = parse_num(r.get("liked_count"))
+        if likes < MIN_LIKES:
+            continue
         dstr = datetime.datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d") if ts else "?"
         new.append({"title": t, "likes": likes, "collected": parse_num(r.get("collected_count")),
                     "board": board, "url": r.get("note_url") or "",
@@ -166,8 +177,8 @@ def build_and_append(rows, kw2board, do_crawl_log=True):
         for n in new:
             n["theme"], n["hook"] = tags.get(n["title"], ("其他", "其他"))
         lib.extend(new)
-        lib.sort(key=lambda x: -x.get("likes", 0))
-        (HERE / "library.json").write_text(json.dumps(lib, ensure_ascii=False, indent=1), encoding="utf-8")
+    lib.sort(key=lambda x: -x.get("likes", 0))
+    (HERE / "library.json").write_text(json.dumps(lib, ensure_ascii=False, indent=1), encoding="utf-8")
     return len(lib), len(new)
 
 
@@ -179,14 +190,16 @@ def main():
     seed = datetime.date.today().toordinal()
 
     print("开始分板块抓取…")
+    all_kws = []
     for b, kws in BOARDS:
         n = len(kws)
         start = seed % n
         chosen = [kws[(start + i) % n] for i in range(PER_RUN)]
         print(f"\n【{b}】本次：{'、'.join(chosen)}")
-        for kw in chosen:
-            print(f"  抓 {kw} …")
-            crawl(kw)
+        all_kws.extend(chosen)
+
+    print(f"\n共 {len(all_kws)} 个词，一次浏览器抓完…")
+    crawl(all_kws)
 
     rows = load_rows()
     total, added = build_and_append(rows, kw2board)
