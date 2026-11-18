@@ -162,6 +162,7 @@
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const mdBold=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const STYLE_INFO={
   "立场型":"说句家长不爱听的，直接点破",
   "反讽型":"把槽点尖刻地拆穿",
@@ -248,7 +249,7 @@ function render(d){
     h+=`<div class="vcard"><span class="tag">${esc(k)}</span><span class="sdesc">${STYLE_INFO[k]}</span> ${cpBtn(v.正文||"")}
       <div class="t">${esc(v.标题||"")}</div>`;
     if(v.封面大字)h+=`<div class="copybox" style="font-weight:600;font-size:16px">${esc(v.封面大字)}</div>`;
-    h+=`<div class="copybox">${esc(v.正文||"")}</div>`;
+    h+=`<div class="copybox">${mdBold(v.正文||"")}</div>`;
     if(v.标签)h+=`<p class="lbl">${esc(v.标签)}</p>`;
     if(v.配图剪辑)h+=`<div class="copybox" style="border-left:3px solid var(--accent);font-size:13px;color:var(--ink-2)">🎬 配图/剪辑：${esc(v.配图剪辑)}</div>`;
     h+=`<p class="meta">${dot} · ${q.字数||0}字</p></div>`;
