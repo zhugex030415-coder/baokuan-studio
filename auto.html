@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>赤舟 · 爆款文案</title>
+<style>
+  :root{--red:#a8232a;--red-soft:#f7ecec;--ink:#1d1d1f;--gray:#6b6b70;--line:#e5e3e0;--bg:#faf9f7;--ok:#2f7d4f;--warn:#b07a12}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  header{background:#fff;border-bottom:2px solid var(--red);padding:14px 24px;display:flex;align-items:center;gap:12px}
+  header h1{font-size:16px;margin:0}
+  header .sub{font-size:12px;color:var(--gray)}
+  nav{display:flex;gap:4px;margin-left:auto}
+  nav button{border:1px solid var(--line);background:#fff;padding:5px 14px;border-radius:14px;font-size:13px;cursor:pointer;color:var(--gray)}
+  nav button.on{background:var(--red);color:#fff;border-color:var(--red)}
+  main{max-width:900px;margin:0 auto;padding:22px}
+  section{display:none}
+  section.on{display:block}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+  textarea{width:100%;font:inherit;border:1px solid var(--line);border-radius:8px;padding:12px;min-height:110px;resize:vertical;line-height:1.75}
+  .btn{background:var(--red);color:#fff;border:0;border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.sm{padding:4px 10px;font-size:12px;border-radius:6px}
+  .ghost{background:#fff;color:var(--red);border:1px solid var(--red)}
+  .out-title{font-size:16px;font-weight:700;margin:0 0 4px}
+  .copybox{background:#fbfaf8;border-radius:8px;padding:14px;white-space:pre-wrap;line-height:1.9;font-size:14px;margin:6px 0 14px}
+  .lbl{font-size:12px;color:var(--gray);margin:0}
+  .chips{margin:4px 0 14px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:14px;padding:3px 11px;font-size:12.5px;cursor:pointer;margin:0 5px 6px 0;color:var(--gray)}
+  .chip.on{background:var(--red);color:#fff;border-color:var(--red)}
+  .ref{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:7px 0;cursor:pointer;background:#fff}
+  .ref:hover{border-color:var(--red)}
+  .ref .n{color:var(--red);font-weight:600;margin-right:8px}
+  .badge{display:inline-block;font-size:11px;border-radius:4px;padding:1px 7px;margin-left:6px}
+  .b-theme{background:#eef2f7;color:#46607d}
+  .b-hook{background:var(--red-soft);color:var(--red)}
+  .board-title{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px}
+  .spin{color:var(--gray);font-size:13px;margin-left:10px}
+  .err{background:#fdecec;border:1px solid #f3c2c2;color:#8a1c22;padding:12px;border-radius:8px;font-size:13px;white-space:pre-wrap}
+  .verdict{font-size:14px;font-weight:600;padding:11px 15px;border-radius:8px;margin-bottom:14px}
+  .v-pass{background:#eaf4ee;color:var(--ok)}
+  .v-fail{background:var(--red-soft);color:#a8232a}
+  details{margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+  summary{cursor:pointer;font-size:13px;color:var(--gray)}
+  @media(max-width:700px){nav{margin-left:0}}
+</style>
+</head>
+<body>
+<header>
+  <h1>赤舟 · 爆款文案</h1>
+  <span class="sub">粘素材，点生成，出成稿</span>
+  <nav>
+    <button data-s="gen" class="on">生成</button>
+    <button data-s="radar">选题雷达</button>
+  </nav>
+</header>
+
+<main>
+<!-- 生成 -->
+<section id="gen" class="on">
+  <div class="card">
+    <textarea id="topic" placeholder="粘素材：家长的原话、一个选题、一句话都行。例：家长说「孩子总是背不下单词」"></textarea>
+    <p style="margin:12px 0 0">
+      <button class="btn" id="run">生成</button>
+      <span class="spin" id="spin"></span>
+    </p>
+  </div>
+  <div id="err" style="display:none"></div>
+  <div id="out"></div>
+</section>
+
+<!-- 选题雷达 -->
+<section id="radar">
+  <div class="card">
+    <h2 style="font-size:15px;margin:0 0 4px">选题雷达</h2>
+    <p class="lbl" style="margin:0 0 10px">每天自动更新一次，历史内容会累积。点一条填进生成框。</p>
+    <div class="chips" id="themeChips"></div>
+    <div id="radarOut"></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function code(){return localStorage.getItem("xhs_code")||""}
+async function apiFetch(url,opts){
+  opts=opts||{};
+  opts.headers=Object.assign({},opts.headers||{},{"X-Access-Code":code()});
+  let r=await fetch(url,opts);
+  if(r.status===401){
+    const c=prompt("请输入访问码");
+    if(c){localStorage.setItem("xhs_code",c);opts.headers["X-Access-Code"]=c;r=await fetch(url,opts);}
+  }
+  return r;
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("on"));
+  document.getElementById(b.dataset.s).classList.add("on");
+});
+
+// ---------- 生成 ----------
+async function copy(text,label){
+  await navigator.clipboard.writeText(text);
+  return label;
+}
+function cpBtn(text,label){
+  const id="c"+Math.random().toString(36).slice(2);
+  setTimeout(()=>{const b=$(id);if(b)b.onclick=async()=>{b.textContent="已复制";setTimeout(()=>b.textContent=label,1100);await navigator.clipboard.writeText(text);};},0);
+  return `<button class="btn sm ghost" id="${id}">${label}</button>`;
+}
+
+$("run").onclick=async()=>{
+  const topic=$("topic").value.trim();
+  if(!topic){alert("先粘素材");return}
+  $("run").disabled=true;$("spin").textContent="正在跑 L1-L5…";
+  $("err").style.display="none";$("out").innerHTML="";
+  try{
+    const r=await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic})});
+    const d=await r.json();
+    if(!r.ok||d.error){showErr(d.error||"出错");return}
+    render(d);
+  }catch(e){showErr("连不上本地服务。确认已双击「启动.bat」。");}
+  finally{$("run").disabled=false;$("spin").textContent="";}
+};
+function showErr(m){$("err").style.display="block";$("err").innerHTML=`<div class="err">${esc(m)}</div>`;}
+
+function render(d){
+  const l1=d.l1,l3=d.l3,l4=d.l4;
+  // L1 退回
+  if(l1["判定"]==="退回"||(l1["死刑"]&&l1["死刑"].length)){
+    $("out").innerHTML=`<div class="card"><div class="verdict v-fail">这个选题没过：${esc(l1["理由"]||"")}</div>
+      <p class="lbl">换一个角度，或者换一条素材再试。</p></div>`;
+    return;
+  }
+  const x=l3["小红书"]||{}, s=l3["视频号"]||{};
+  let h="";
+  h+=`<div class="card">`;
+  h+=`<p class="lbl">标题 ${cpBtn(x["标题"]||"","复制")}</p><p class="out-title">${esc(x["标题"])}</p>`;
+  if(x["封面大字"]){h+=`<p class="lbl">封面大字</p><div class="copybox">${esc(x["封面大字"])}</div>`;}
+  const revised = (d.l4 && d.l4["修订稿"]) ? d.l4["修订稿"] : "";
+  const body = revised || x["正文"] || "";
+  h+=`<p class="lbl">小红书正文 ${cpBtn(body,"复制")}${revised?'<span class="badge b-theme" style="margin-left:6px">已自动去AI味</span>':''}</p><div class="copybox">${esc(body)}</div>`;
+  if(x["标签"]){h+=`<p class="lbl">${esc(x["标签"])}</p>`;}
+  if(s["口播稿"]){h+=`<p class="lbl" style="margin-top:14px">视频号口播 ${cpBtn(s["口播稿"]||"","复制")}</p><div class="copybox">${esc(s["口播稿"])}</div>`;}
+  h+=`<details><summary>后台数据（L1 得分 / L4 质检）</summary><div class="copybox" style="margin-top:8px;font-size:13px">${esc(JSON.stringify({L1:l1,L4:l4["报告"]},null,1))}</div></details>`;
+  h+=`</div>`;
+  $("out").innerHTML=h;
+}
+
+// ---------- 选题雷达 ----------
+const THEMES=["全部","单词记忆","自然拼读","语法","听力","口语","阅读·原版书","写作","KET·PET","启蒙方法","动画·儿歌","学习习惯","选课·选班","择校","政策","分班","学校","其他"];
+let LIB=[], curTheme="全部";
+function renderChips(){
+  const box=$("themeChips");
+  box.innerHTML="";
+  THEMES.forEach(t=>{
+    const b=document.createElement("button");
+    b.className="chip"+(t===curTheme?" on":"");
+    b.textContent=t;
+    b.onclick=()=>{curTheme=t;renderChips();renderRadar();};
+    box.appendChild(b);
+  });
+}
+function renderRadar(){
+  const box=$("radarOut");
+  box.innerHTML="";
+  const byBoard={};
+  LIB.forEach(item=>{
+    const t=item.theme||"其他";
+    if(curTheme!=="全部"&&t!==curTheme)return;
+    (byBoard[item.board||"综合"]=byBoard[item.board||"综合"]||[]).push(item);
+  });
+  if(!LIB.length){box.innerHTML=`<p class="lbl">素材库是空的。先双击「刷新素材.bat」抓一次。</p>`;return}
+  for(const board in byBoard){
+    const h=document.createElement("div");
+    h.className="board-title";
+    h.textContent=`${board}（${byBoard[board].length}）`;
+    box.appendChild(h);
+    byBoard[board].forEach(item=>{
+      const d=document.createElement("div");
+      d.className="ref";
+      const like=item.likes>=10000?(item.likes/10000).toFixed(1)+"万":item.likes;
+      d.innerHTML=`<span class="n">${like}赞</span>${esc(item.title)}`+
+        `<span class="badge b-theme">${esc(item.theme||"其他")}</span>`+
+        `<span class="badge b-hook">${esc(item.hook||"其他")}</span>`+
+        `<span class="lbl" style="margin-left:6px">${item.first_seen||""}</span>`;
+      d.onclick=()=>{
+        $("topic").value=item.title;
+        document.querySelector('nav button[data-s="gen"]').click();
+      };
+      box.appendChild(d);
+    });
+  }
+}
+(async()=>{
+  renderChips();
+  try{
+    const r=await apiFetch("/library.json",{cache:"no-store"});
+    if(r.ok){LIB=await r.json();}
+  }catch(e){}
+  renderRadar();
+})();
+</script>
+</body>
+</html>
