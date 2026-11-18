@@ -555,13 +555,14 @@ def parse_multi(text):
     blocks = [b.strip() for b in re.split(r"=+\s*", text or "") if b.strip()]
     for b in blocks:
         d = {}
-        for tag in ("写法", "标题", "封面", "正文", "标签"):
+        for tag in ("写法", "标题", "封面", "正文", "标签", "配图剪辑"):
             m = re.search(r"【" + tag + r"】\s*(.*?)(?=\n【|\Z)", b, re.S)
             d[tag] = m.group(1).strip() if m else ""
         name = d.get("写法", "").strip()
         if name:
             out[name] = {"标题": d.get("标题", ""), "封面大字": d.get("封面", ""),
-                         "正文": d.get("正文", ""), "标签": d.get("标签", "")}
+                         "正文": d.get("正文", ""), "标签": d.get("标签", ""),
+                         "配图剪辑": d.get("配图剪辑", "")}
     return out
 
 
@@ -624,12 +625,17 @@ def run_multi(topic, mode, style_keys, mock=False):
 
 写完后自查一遍：读者能不能用一句话复述这版在说什么？不能，就重写开头，把观点提前。
 
+配图剪辑建议（每个版本都要给，写具体，2-3 句）：
+- 小红书版：封面图大字写什么、用什么颜色；正文配 3-6 张图各放什么（封面大字图、对比图、清单图、案例截图、结尾引导图）。
+- 视频号版（短打型）：前 3 秒钩子画面拍什么、字幕怎么加、节奏哪里停顿、BGM 什么类型、总时长。
+
 严格按下面格式输出，每个版本之间用单独一行「=====」隔开，不要代码块：
 【写法】立场型
 【标题】
 【封面】
 【正文】
-【标签】"""
+【标签】
+【配图剪辑】"""
     raw = call_model([{"role": "system", "content": SYS_PERSONA},
                       {"role": "user", "content": prompt}],
                      w["key"], w["model"], w["api"], want_json=False, temperature=0.9)
