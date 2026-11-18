@@ -5,76 +5,154 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>赤舟 · 爆款改写器</title>
 <style>
-  :root{--red:#a8232a;--red-soft:#f7ecec;--ink:#1d1d1f;--gray:#6b6b70;--line:#e5e3e0;--bg:#faf9f7;--ok:#2f7d4f;--warn:#b07a12}
+  :root{
+    --bg:#f5f6f8; --card:#ffffff;
+    --ink:#1c1f24; --ink-2:#68707d; --line:#e6e8ec;
+    --accent:#c74a52; --accent-deep:#ad3941; --accent-soft:#fbeff0;
+    --ok:#2f8f5b;
+    --sans:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-  header{background:#fff;border-bottom:2px solid var(--red);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:9}
-  header h1{font-size:16px;margin:0}
-  header .sub{font-size:12px;color:var(--gray)}
-  nav{display:flex;gap:4px;margin-left:auto}
-  nav button{border:1px solid var(--line);background:#fff;padding:5px 14px;border-radius:14px;font-size:13px;cursor:pointer;color:var(--gray)}
-  nav button.on{background:var(--red);color:#fff;border-color:var(--red)}
-  main{max-width:920px;margin:0 auto;padding:22px}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
+  header{
+    background:#fff;border-bottom:1px solid var(--line);
+    padding:16px 28px;display:flex;align-items:center;gap:12px;
+    position:sticky;top:0;z-index:9;
+  }
+  header h1{font-size:17px;margin:0;font-weight:600;color:var(--ink)}
+  header .sub{font-size:12.5px;color:var(--ink-2)}
+  nav{display:flex;gap:6px;margin-left:auto}
+  nav button{
+    background:#fff;border:1px solid var(--line);color:var(--ink-2);
+    padding:6px 16px;border-radius:8px;font-size:13px;cursor:pointer;transition:.15s;
+  }
+  nav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  nav button:hover{border-color:var(--ink-2)}
+  main{max-width:880px;margin:24px auto;padding:0 18px 60px}
   section{display:none}
   section.on{display:block}
-  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
-  textarea{width:100%;font:inherit;border:1px solid var(--line);border-radius:8px;padding:12px;min-height:110px;resize:vertical;line-height:1.75}
-  .btn{background:var(--red);color:#fff;border:0;border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn.sm{padding:4px 10px;font-size:12px;border-radius:6px}
-  .ghost{background:#fff;color:var(--red);border:1px solid var(--red)}
-  .chk{display:inline-flex;align-items:center;gap:5px;margin:4px 12px 4px 0;font-size:14px;cursor:pointer}
-  .chk input{width:auto}
-  .spin{color:var(--gray);font-size:13px;margin-left:10px}
-  .vcard{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;background:#fff}
-  .vcard .tag{background:var(--red);color:#fff;border-radius:5px;padding:2px 10px;font-size:12px}
-  .vcard .t{font-size:16px;font-weight:700;margin:8px 0}
-  .copybox{background:#fbfaf8;border-radius:8px;padding:14px;white-space:pre-wrap;line-height:1.9;font-size:14px;margin:6px 0}
-  .lbl{font-size:12px;color:var(--gray);margin:0}
-  .meta{font-size:12px;color:var(--gray);margin-top:6px}
-  .ok{color:var(--ok)} .bad{color:var(--red)} .mid{color:var(--warn)}
-  .chips{margin:6px 0 14px}
-  .chip{border:1px solid var(--line);background:#fff;border-radius:14px;padding:3px 11px;font-size:12.5px;cursor:pointer;margin:0 5px 6px 0;color:var(--gray)}
-  .chip.on{background:var(--red);color:#fff;border-color:var(--red)}
-  .ref{border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:6px 0;cursor:pointer;background:#fff;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .ref:hover{border-color:var(--red)}
-  .ref .n{color:var(--red);font-weight:600;flex:none}
-  .ref .ttl{flex:1;min-width:200px}
-  .ref a{color:var(--red);text-decoration:none;font-size:12px;flex:none}
-  .board-title{font-size:14px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px}
-  .err{background:#fdecec;border:1px solid #f3c2c2;color:#8a1c22;padding:12px;border-radius:8px;font-size:13px;white-space:pre-wrap}
+
+  .guide{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:18px 22px;margin-bottom:16px;
+  }
+  .guide h3{margin:0 0 8px;font-size:15px;font-weight:600;color:var(--ink)}
+  .guide ol{margin:0;padding-left:22px;font-size:14px;line-height:2;color:var(--ink-2)}
+  .guide b{color:var(--ink)}
+  .guide .link{color:var(--accent);cursor:pointer}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:22px 24px;margin-bottom:16px;
+  }
+  .modebar{font-size:12.5px;color:var(--ink-2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .badge{background:#eef0f3;color:var(--ink-2);border-radius:5px;padding:2px 9px;font-size:12px}
+  .badge.rewrite{background:var(--accent-soft);color:var(--accent)}
+
+  textarea{
+    width:100%;font:15px/1.8 var(--sans);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;min-height:104px;resize:vertical;background:#fff;
+    color:var(--ink);transition:border .15s;
+  }
+  textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(199,74,82,.10)}
+
+  .btn{
+    background:var(--accent);color:#fff;border:0;border-radius:9px;
+    padding:11px 26px;font-size:15px;cursor:pointer;transition:.15s;
+  }
+  .btn:hover{background:var(--accent-deep)}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--line)}
+  .btn.ghost:hover{background:var(--accent-soft)}
+  .btn.sm{padding:4px 12px;font-size:12px;border-radius:7px}
+  .spin{color:var(--ink-2);font-size:13px;margin-left:12px}
+
+  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 2px}
+  .scard{
+    border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;
+    background:#fff;transition:.15s;user-select:none;
+  }
+  .scard:hover{border-color:var(--ink-2)}
+  .scard.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .scard .sname{font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:2px}
+  .scard.sel .sname{color:var(--accent-deep)}
+  .scard .sdesc{font-size:12px;color:var(--ink-2)}
+
+  .lbl{font-size:12px;color:var(--ink-2);margin:0}
+
+  .vcard{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:20px 24px;margin-bottom:16px;
+  }
+  .vcard .tag{background:var(--accent);color:#fff;border-radius:5px;padding:3px 11px;font-size:12.5px}
+  .vcard .sdesc{font-size:12px;color:var(--ink-2);margin-left:8px}
+  .vcard .t{font-size:17px;font-weight:600;margin:12px 0 4px;color:var(--ink)}
+  .copybox{background:#f8f9fb;border:1px solid var(--line);border-radius:10px;padding:16px 18px;white-space:pre-wrap;line-height:2;font-size:15px;margin:8px 0;color:var(--ink)}
+  .meta{font-size:12px;color:var(--ink-2);margin-top:6px}
+  .ok{color:var(--ok)} .bad{color:var(--accent)}
+  .chips{margin:8px 0 16px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 13px;font-size:12.5px;cursor:pointer;margin:0 6px 6px 0;color:var(--ink-2);transition:.15s}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip:hover{border-color:var(--ink-2)}
+  .board-title{font-size:15px;font-weight:600;margin:18px 0 8px;color:var(--ink)}
+  .ref{border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:7px 0;cursor:pointer;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;transition:.15s}
+  .ref:hover{border-color:var(--ink-2)}
+  .ref .n{color:var(--accent);font-weight:600;flex:none;font-size:13px}
+  .ref .ttl{flex:1;min-width:180px;font-size:14px}
+  .ref .lbl{color:var(--ink-2)}
+  .ref a{color:var(--accent);text-decoration:none;font-size:12px;flex:none}
+  .err{background:#fdecec;border:1px solid #f3c2c2;color:#8a1c22;padding:14px;border-radius:10px;font-size:13px;white-space:pre-wrap}
+  @media(max-width:680px){.sgrid{grid-template-columns:1fr}nav{margin-left:0}}
 </style>
 </head>
 <body>
 <header>
   <h1>赤舟 · 爆款改写器</h1>
-  <span class="sub">贴素材 → 选写法 → 一次出多版</span>
+  <span class="sub">贴素材 · 勾写法 · 二十秒出稿</span>
   <nav>
-    <button data-s="gen" class="on">生成</button>
-    <button data-s="radar">爆款雷达</button>
+    <button data-s="gen" class="on">写文案</button>
+    <button data-s="radar">爆款库</button>
   </nav>
 </header>
 
 <main>
 <section id="gen" class="on">
+  <div class="guide">
+    <h3>三步出稿</h3>
+    <ol>
+      <li><b>贴素材</b>：家长原话、一个选题、一句话都行。没有就点「试个例子」，或去 <span class="link" onclick="goRadar()">爆款库</span> 挑一条</li>
+      <li><b>勾写法</b>：点卡片选，要几种点几种</li>
+      <li><b>点「生成」</b>，约 20 秒出结果，挑一版复制去发</li>
+    </ol>
+  </div>
+
   <div class="card">
-    <textarea id="topic" placeholder="贴素材：家长的原话、一个选题、一句话都行。也可以去「爆款雷达」点一条自动填进来。"></textarea>
-    <div style="margin:12px 0 4px"><span class="lbl">这次要哪几种写法：</span></div>
-    <div id="styles"></div>
-    <p style="margin:12px 0 0">
+    <div class="modebar">当前模式：<span class="badge" id="modeBadge">原创 · 手打素材</span></div>
+    <textarea id="topic" placeholder="贴素材。例：家长说给孩子报了一年两万的英语班，成绩没变化。"></textarea>
+    <p style="margin:10px 0 0"><button class="btn ghost sm" id="example">试个例子</button></p>
+
+    <p class="lbl" style="margin:16px 0 4px">要哪几种写法（点卡片选）：</p>
+    <div class="sgrid" id="styles"></div>
+
+    <p style="margin:18px 0 0">
       <button class="btn" id="run">生成</button>
       <span class="spin" id="spin"></span>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);margin-left:16px;cursor:pointer">
+        <input type="checkbox" id="review" checked> K3 通顺审核
+      </label>
     </p>
-    <p class="lbl" style="margin-top:8px">一次约 1-3 分钟，勾得越少越快。</p>
+    <p class="lbl" style="margin-top:10px">选得越少越快。开了 K3 审核会再多花几十秒，但句子更通顺。</p>
   </div>
+
   <div id="err" style="display:none"></div>
   <div id="out"></div>
 </section>
 
 <section id="radar">
   <div class="card">
-    <h2 style="font-size:15px;margin:0 0 4px">爆款雷达</h2>
-    <p class="lbl" style="margin:0 0 10px">每天自动更新。点标题填进生成框（改写模式），点「看原文」打开原笔记。</p>
+    <h2 class="board-title" style="margin-top:0">爆款库</h2>
+    <p class="lbl" style="margin:0 0 10px">同赛道真爆款。点标题 = 照着它的骨架改写（不是抄）。「看原文」打开原笔记对照。</p>
     <div class="chips" id="themeChips"></div>
     <div id="radarOut"></div>
   </div>
@@ -84,9 +162,24 @@
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-const STYLES=["立场型","反讽型","共情型","短打型","干货型"];
+const STYLE_INFO={
+  "立场型":"说句家长不爱听的，直接点破",
+  "反讽型":"把槽点尖刻地拆穿",
+  "共情型":"先安抚再讲道理",
+  "短打型":"60秒口播稿，发视频号",
+  "干货型":"给一个能照着做的方法",
+};
+const EXAMPLE="家长说给孩子报了一年两万的英语班，成绩没变化，怀疑被割了韭菜";
 let curTheme="全部", LIB=[], mode="原创";
+const selected=new Set(Object.keys(STYLE_INFO));
 
+function goRadar(){document.querySelector('nav button[data-s="radar"]').click();}
+function setMode(m){
+  mode=m;
+  const b=$("modeBadge");
+  if(m==="改写"){b.textContent="改写 · 照爆款骨架重写";b.className="badge rewrite";}
+  else{b.textContent="原创 · 手打素材";b.className="badge";}
+}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on");
@@ -94,16 +187,20 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.getElementById(b.dataset.s).classList.add("on");
 });
 
-// 写法勾选
+// 写法卡片
 (function(){
   const box=$("styles");
-  STYLES.forEach(s=>{
-    const l=document.createElement("label");
-    l.className="chk";
-    l.innerHTML=`<input type="checkbox" value="${s}" checked> ${s}`;
-    box.appendChild(l);
+  Object.entries(STYLE_INFO).forEach(([s,desc])=>{
+    const d=document.createElement("div");
+    d.className="scard sel";
+    d.innerHTML=`<div class="sname">${s}</div><div class="sdesc">${desc}</div>`;
+    d.onclick=()=>{selected.has(s)?selected.delete(s):selected.add(s);d.classList.toggle("sel");};
+    box.appendChild(d);
   });
 })();
+
+$("example").onclick=()=>{$("topic").value=EXAMPLE;setMode("原创");};
+$("topic").oninput=()=>setMode("原创");
 
 function code(){return localStorage.getItem("xhs_code")||""}
 async function apiFetch(url,opts){
@@ -117,46 +214,47 @@ async function apiFetch(url,opts){
   return r;
 }
 
-// 生成
 $("run").onclick=async()=>{
   const topic=$("topic").value.trim();
-  if(!topic){alert("先贴素材");return}
-  const styles=[...document.querySelectorAll("#styles input:checked")].map(i=>i.value);
-  if(!styles.length){alert("至少勾一种写法");return}
-  $("run").disabled=true;$("spin").textContent="正在写…约 1-3 分钟，别关页面";
+  if(!topic){alert("先贴素材，或点「试个例子」");return}
+  const styles=[...selected];
+  if(!styles.length){alert("至少点选一种写法");return}
+  $("run").disabled=true;$("spin").textContent="正在写…约 20 秒，别关页面";
   $("err").style.display="none";$("out").innerHTML="";
   try{
     const r=await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({素材:topic,模式:mode,写法:styles})});
+      body:JSON.stringify({素材:topic,模式:mode,写法:styles,审核:$("review").checked})});
     const d=await r.json();
     if(!r.ok||d.error){showErr(d.error||"出错");return}
     render(d);
-  }catch(e){showErr("连不上服务。确认已双击「启动.bat」。");}
+  }catch(e){showErr("连不上服务。确认已双击「启动.bat」后刷新页面。");}
   finally{$("run").disabled=false;$("spin").textContent="";}
 };
 function showErr(m){$("err").style.display="block";$("err").innerHTML=`<div class="err">${esc(m)}</div>`;}
 
 function cpBtn(txt){const id="c"+Math.random().toString(36).slice(2);
   setTimeout(()=>{const b=$(id);if(b)b.onclick=async()=>{await navigator.clipboard.writeText(txt);b.textContent="已复制";setTimeout(()=>b.textContent="复制",1100);};},0);
-  return `<button class="btn sm ghost" id="${id}">复制</button>`;}
+  return `<button class="btn ghost sm" id="${id}">复制</button>`;}
 
 function render(d){
   const versions=d.versions||{}, qc=d.质检||{};
-  let h="";
-  for(const k of STYLES){
+  const reviewed=d.已审核?'<span class="ok"> · K3 已审核</span>':'';
+  let h=`<div class="card"><h2 class="board-title" style="margin-top:0">出稿了，挑一版复制去发${reviewed}</h2><p class="lbl">几版语气不同、骨架一样。绿勾=可直接用。</p></div>`;
+  for(const k of Object.keys(STYLE_INFO)){
     const v=versions[k];
     if(!v)continue;
     const q=qc[k]||{};
-    let meta=`<span class="${q.像真人?'ok':'bad'}">像真人:${q.像真人?'是':'否'}</span> · 字数${q.字数} · 口语词${q.口语词}`;
-    h+=`<div class="vcard"><span class="tag">${esc(k)}</span> ${cpBtn(v.正文||"")}
+    const dot=q.像真人?'<span class="ok">✓ 可用</span>':'<span class="bad">建议改改</span>';
+    h+=`<div class="vcard"><span class="tag">${esc(k)}</span><span class="sdesc">${STYLE_INFO[k]}</span> ${cpBtn(v.正文||"")}
       <div class="t">${esc(v.标题||"")}</div>`;
-    if(v.封面大字)h+=`<div class="copybox" style="font-size:15px;font-weight:600">${esc(v.封面大字)}</div>`;
+    if(v.封面大字)h+=`<div class="copybox" style="font-weight:600;font-size:16px">${esc(v.封面大字)}</div>`;
     h+=`<div class="copybox">${esc(v.正文||"")}</div>`;
     if(v.标签)h+=`<p class="lbl">${esc(v.标签)}</p>`;
-    h+=`<p class="meta">${meta}</p></div>`;
+    h+=`<p class="meta">${dot} · ${q.字数||0}字</p></div>`;
   }
-  if(!h)h=`<div class="card"><p class="lbl">没有生成内容。</p></div>`;
+  if(!Object.keys(versions).length)h=`<div class="card"><p class="lbl">没有生成内容。</p></div>`;
   $("out").innerHTML=h;
+  $("out").scrollIntoView({behavior:"smooth"});
 }
 
 // 雷达
@@ -176,13 +274,12 @@ function renderRadar(){
     const h=document.createElement("div");h.className="board-title";h.textContent=`${board}（${byBoard[board].length}）`;box.appendChild(h);
     byBoard[board].forEach(it=>{
       const d=document.createElement("div");d.className="ref";
-      d.innerHTML=`<span class="n">${fmt(it.likes||0)}赞</span><span class="ttl">${esc(it.title)}</span>`;
-      if(it.theme)d.insertAdjacentHTML("beforeend",`<span class="lbl">${esc(it.theme)}</span>`);
+      d.innerHTML=`<span class="n">${fmt(it.likes||0)}赞</span><span class="ttl">${esc(it.title)}</span><span class="lbl">改写这篇</span>`;
       const a=document.createElement("a");
       if(it.url){a.href=it.url;a.target="_blank";a.textContent="看原文 ↗";}
       d.appendChild(a);
-      d.querySelector(".ttl").onclick=()=>{
-        mode="改写";$("topic").value=it.title;
+      d.onclick=(e)=>{if(e.target.tagName==="A")return;
+        setMode("改写");$("topic").value=it.title;
         document.querySelector('nav button[data-s="gen"]').click();
       };
       box.appendChild(d);
