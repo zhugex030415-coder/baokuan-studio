@@ -36,6 +36,9 @@ CONFIG = _load_config()
 CONFIG_KEY = os.environ.get("DEEPSEEK_KEY", "").strip() or CONFIG.get("key", "")
 CONFIG_MODEL = os.environ.get("DEEPSEEK_MODEL", "").strip() or CONFIG.get("model", DEFAULT_MODEL)
 CONFIG_API = os.environ.get("DEEPSEEK_API", "").strip() or CONFIG.get("api", DEFAULT_API)
+# 双模型分工：writer 负责写稿，polisher 负责改语气和其余环节
+CONFIG_WRITER = CONFIG.get("writer") or {"key": CONFIG_KEY, "api": CONFIG_API, "model": CONFIG_MODEL}
+CONFIG_POLISHER = CONFIG.get("polisher") or {"key": CONFIG_KEY, "api": CONFIG_API, "model": CONFIG_MODEL}
 # 访问码：公开到公网时设置，防止别人白用你的额度
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
 
@@ -72,12 +75,21 @@ class ModelError(Exception):
 
 
 def call_model(messages, key, model, api, want_json=True, temperature=0.85):
+    # 推理模型（Kimi K3 / DeepSeek V4 Pro）会先思考，需要大 token 预算；
+    # Kimi 还只接受 temperature=1
+    m = str(model).lower()
+    is_kimi = "kimi" in m
+    if is_kimi:
+        temperature = 1
     payload = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
-        "max_tokens": 2400,
+        "max_tokens": 16000 if is_kimi else 8000,
     }
+    # DeepSeek 推理模型默认会先深度思考（慢），显式关掉思考
+    if "v4-pro" in m or "reasoner" in m:
+        payload["reasoning_effort"] = "none"
     if want_json:
         payload["response_format"] = {"type": "json_object"}
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -87,7 +99,7 @@ def call_model(messages, key, model, api, want_json=True, temperature=0.85):
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=150) as r:
+        with urllib.request.urlopen(req, timeout=(600 if is_kimi else 200)) as r:
             data = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "ignore")[:400]
@@ -140,6 +152,31 @@ SYS = """你是一位在长沙带小学 3-6 年级英语的老师，教了七八
 你写东西像在跟一个家长面对面聊天，想到哪说到哪，会自我纠正，会承认「这个我不打包票」。
 你只输出 JSON，不要任何解释。"""
 
+# 纯文本输出版本（不用 JSON，避免截断和解析问题）
+SYS_TEXT = SYS.replace("你只输出 JSON，不要任何解释。", "直接输出成稿正文，不要解释，不要代码块。")
+
+# 干货型：用 oil-tone 的规范（清楚、自然、不拔高）
+STYLE_DRY = """这一篇是干货型，按下面的规范写：
+
+1 句子写完整、按自然语序。不要为了显得利落把话压成生硬短句；「的」「了」只要承担语法或语气作用就保留，别当成赘词删掉。
+2 把关系讲完整。家长不知道的那一步要补上，事实、原因、结果之间不能跳。
+3 结尾给一个能照着做的办法，步骤要具体到今晚就能做，再引导收藏和报年级。
+4 不要金句，不要拔高，不要喊口号，不要模板化转场。删掉之后不影响意思的句子，直接删。
+5 不要为了显得口语而机械加语气词。
+6 有一个地方承认你不确定就够了，别反复说。
+7 标题说清真实对象和判断，不夸张。"""
+
+# 事件型：用卡兹克那套（有态度、口语、留一半给评论区）
+STYLE_EVENT = """这一篇是事件型，按下面的规范写：
+
+1 从一个具体的人、一个具体的时刻切入，不宏大叙事。
+2 给一句明确的立场判断，敢说。观点可以先站到对方角度（「我非常理解」），再说你的。
+3 可以让情绪起伏：有一处用一个极短句独立成段，制造停顿，但别每段都断。
+4 有一个金句，能单独拿出来传播的那一句。
+5 不塞方法论，不给步骤，把结论留一半给评论区。
+6 结尾问一个家长能立刻回答的问题，引导讨论，不引导收藏。
+7 编不出来的真实信息（名字、年龄、数字）写【】留空。"""
+
 
 def run_l1(topic, key, model, api, mock=False):
     if mock:
@@ -160,8 +197,13 @@ def run_l1(topic, key, model, api, mock=False):
 3 出现红线词且改写后失去力量
 4 只讲知识，没讲「谁做错了什么」
 
+再判内容类型（二选一，决定结尾怎么写）：
+- 干货：素材指向「教一个方法 / 纠正一个做错的做法」——家长看完该学会做点什么
+- 事件：素材指向「一个现象 / 一个判断 / 一个槽点 / 一个共鸣」——家长看完该想说点什么
+
 输出 JSON：
 {{"反差":int,"具体":int,"立场":int,"代入":int,"缺口":int,"总分":int,
+"类型":"干货|事件",
 "死刑":[命中条目原文, ...],"判定":"过|重评|退回","理由":"一句话，指出最该补的那一维"}}
 
 总分>=16 判过；13-15 判重评；<=12 判退回。有死刑项一律判退回。"""
@@ -227,6 +269,8 @@ def run_l3(topic, l1, l2, platform, key, model, api, mock=False):
                 "口播稿": "很多家长问我，孩子单词都认识，为什么还是读不懂句子。\n\n我的回答通常是：问题不在单词。\n\n英文句子不是按词读的，是按意群读的。孩子一个词一个词翻译，读到后面忘了前面，句子一长就崩。\n\n所以我不先让他背词，我让他先数动词。一个句子有几个动词，就有几个分句。再圈出连接词，那就是该断的地方。\n\n然后用纸写下来：主句一行，从句缩进。写完他自己就看见结构了。\n\n背单词解决认不认识，断句解决读不读得懂。这是两件事。"
             }
         }
+    kind = (l1.get("类型") or "干货") if isinstance(l1, dict) else "干货"
+    style = STYLE_DRY if kind == "干货" else STYLE_EVENT
     prompt = f"""语气参考（学语气，别学它的选题和结构）：
 
 例1——
@@ -243,20 +287,20 @@ def run_l3(topic, l1, l2, platform, key, model, api, mock=False):
 问题不在书，在级别。挑书有个特别土但特别准的办法，叫五指法则。随便翻一页让他读，一个生词伸一根手指。2 到 3 根，就是刚好。
 书多不多不是关键，匹配才关键。
 
-现在写一篇。素材是：
-{topic}
+素材：{topic}
+内容类型：{kind}
 
-要求就三条：
-1. 开头从素材里的真实情况切入，别架空。
-2. 中间给一个能带走、有名字、能照着做的办法（像「五指法则」「三听法」那样）。
-3. 结尾问一个家长能立刻回答的具体问题（报年级、报时间都行）。
+{style}
 
-凡是编不出来的真实信息——孩子名字、年龄、具体数字——就写【】留空，不要瞎编。
+通用要求：从具体当下的事切入，不宏大叙事；数字用阿拉伯数字；知识要「随手掏」——说「我突然想起来」，不说「下面介绍」。
 
 输出 JSON：
 {{"小红书":{{"标题":"","封面大字":"","正文":"","标签":""}},
 "视频号":{{"口播稿":""}}}}"""
-    raw = call_model([{"role": "system", "content": SYS}, {"role": "user", "content": prompt}], key, model, api, temperature=0.9)
+    # 写稿用 writer（Kimi K3），其余环节用 DeepSeek
+    w = CONFIG_WRITER
+    raw = call_model([{"role": "system", "content": SYS}, {"role": "user", "content": prompt}],
+                     w["key"], w["model"], w["api"], temperature=0.9)
     return extract_json(raw)
 
 
@@ -407,6 +451,159 @@ def run_l5(topic, l1, l2, l3, mock=False):
 
 
 # ---------------------------------------------------------------- HTTP
+# ---------------------------------------------------------------- 一次调用出稿
+FMT_HINT = """严格按下面格式输出，不要任何多余的话、不要代码块：
+
+【类型】干货 或 事件
+【标题】
+【封面】
+【正文】
+【标签】
+【口播】"""
+
+
+def parse_single(text):
+    parts = re.split(r"【(类型|标题|封面|正文|标签|口播)】", text or "")
+    d = {}
+    for i in range(1, len(parts) - 1, 2):
+        d[parts[i]] = parts[i + 1].strip()
+    return {
+        "类型": "事件" if "事件" in d.get("类型", "") else "干货",
+        "标题": d.get("标题", ""),
+        "封面大字": d.get("封面", ""),
+        "正文": d.get("正文", ""),
+        "标签": d.get("标签", ""),
+        "口播稿": d.get("口播", ""),
+    }
+
+
+def run_single(topic, mock=False, use="writer"):
+    """判类型 + 出标题 + 写成稿，一次调用搞定。use=writer(K3) 或 polisher(DeepSeek)"""
+    if mock:
+        return {"类型": "干货", "标题": "示例标题", "封面大字": "示例",
+                "正文": "示例正文。", "标签": "#示例", "口播稿": "示例口播。"}
+    w = CONFIG_WRITER if use == "writer" else CONFIG_POLISHER
+    prompt = f"""素材：{topic}
+
+先自己判断这份素材属于哪一类：
+- 干货：素材指向「教一个方法 / 纠正一个做错的做法」，读者看完该学会做点什么
+- 事件：素材指向「一个现象 / 一个判断 / 一个槽点 / 一个共鸣」，读者看完该想说点什么
+
+然后按对应规范写。
+
+【判为干货，用这套】
+{STYLE_DRY}
+
+【判为事件，用这套】
+{STYLE_EVENT}
+
+通用要求：从具体当下的事切入，不宏大叙事；数字用阿拉伯数字；知识要「随手掏」——说「我突然想起来」，不说「下面介绍」；编不出来的真实信息（名字 / 年龄 / 具体数字）写【】留空，不要瞎编。
+
+小红书正文 350-600 字，视频号口播 180-220 字。
+
+{FMT_HINT}"""
+    raw = call_model([{"role": "system", "content": SYS_TEXT}, {"role": "user", "content": prompt}],
+                     w["key"], w["model"], w["api"], want_json=False, temperature=0.9)
+    return parse_single(raw)
+
+
+def tone_polish(text, kind, mock=False):
+    """只改语气，不动内容。用 K3 做这一层。"""
+    if mock or not text:
+        return text
+    w = CONFIG_WRITER
+    style = STYLE_DRY if kind == "干货" else STYLE_EVENT
+    prompt = f"""下面是初稿。请只改语气，不动内容。
+
+{style}
+
+硬要求：改完还是同一篇，观点、事实、数字、步骤一条都不许丢，也不许加新信息。
+直接输出改好的正文，不要解释、不要加标题。"""
+
+    raw = call_model([{"role": "system", "content": SYS_TEXT},
+                      {"role": "user", "content": prompt + "\n\n初稿：\n" + text}],
+                     w["key"], w["model"], w["api"], want_json=False, temperature=0.9)
+    return (raw or "").strip() or text
+
+
+# ---------------------------------------------------------------- 范文库 + 多写法生成
+def _load_styles():
+    try:
+        return json.loads((ROOT / "styles.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+STYLES = _load_styles()
+
+SYS_PERSONA = """你是赤舟国际教育（长沙）的老师，带小学 3-6 年级的普娃，家长普遍焦虑。
+你说话直接、有点不耐烦，但真心为孩子着急。
+你举的例子都有具体细节：时间、场景、孩子亲口说的话、真实的数字。
+你不说官话套话，不堆金句，不喊口号。
+编不出来的真实信息（名字 / 年龄 / 数字）写【】留空，绝不瞎编。"""
+
+
+def parse_multi(text):
+    """把「=====」分隔的多版本文本解析成 {写法: {标题,封面,正文,标签}}"""
+    out = {}
+    blocks = [b.strip() for b in re.split(r"=+\s*", text or "") if b.strip()]
+    for b in blocks:
+        d = {}
+        for tag in ("写法", "标题", "封面", "正文", "标签"):
+            m = re.search(r"【" + tag + r"】\s*(.*?)(?=\n【|\Z)", b, re.S)
+            d[tag] = m.group(1).strip() if m else ""
+        name = d.get("写法", "").strip()
+        if name:
+            out[name] = {"标题": d.get("标题", ""), "封面大字": d.get("封面", ""),
+                         "正文": d.get("正文", ""), "标签": d.get("标签", "")}
+    return out
+
+
+def run_multi(topic, mode, style_keys, mock=False):
+    """一次调用，同时生成多种写法。"""
+    style_keys = [s for s in style_keys if s in STYLES] or list(STYLES.keys())
+    if mock:
+        return {k: {"标题": "示例标题", "封面大字": "示例", "正文": "示例正文。", "标签": "#示例"} for k in style_keys}
+
+    w = CONFIG_WRITER
+    style_block = ""
+    for k in style_keys:
+        s = STYLES[k]
+        style_block += f"\n【{k}】{s['desc']}\n范文（学口吻，不学内容）：\n标题：{s['title']}\n{s['body']}\n"
+
+    if mode == "改写":
+        mode_desc = "这是一条爆款标题。先想它为什么能爆（钩子、选题角度），保留这个骨架，但用你自己的话、你的赛道、你的真实经验重写。"
+    else:
+        mode_desc = "这是你自己要写的素材，按素材展开成文。"
+
+    prompt = f"""素材：{topic}
+
+{mode_desc}
+
+要写下面 {len(style_keys)} 种写法，每种的口吻照着各自的范文：
+{style_block}
+
+通用铁律：
+1 开头从具体当下的事切入，能用家长原话就引原话，不宏大叙事。
+2 段落有长有短，至少一段 5 字以内独立成段。
+3 口语词自然（其实、说实话、反正、挺、吧、嘛），但不硬凑。
+4 有一处自我修正或不确定（「我一开始也以为」「这个我不打包票」）。
+5 不用冒号、破折号、双引号，用「」。
+6 数字用阿拉伯数字。编不出来的真实信息写【】留空。
+7 结尾按写法走：立场型 / 反讽型 / 共情型 / 短打型引导讨论或共鸣；干货型给方法并引导收藏、报年级。
+
+正文 400-550 字，短打型是 180-220 字的口播稿。
+
+严格按下面格式输出，每个版本之间用单独一行「=====」隔开，不要代码块：
+【写法】立场型
+【标题】
+【封面】
+【正文】
+【标签】"""
+    raw = call_model([{"role": "system", "content": SYS_PERSONA},
+                      {"role": "user", "content": prompt}],
+                     w["key"], w["model"], w["api"], want_json=False, temperature=0.9)
+    return parse_multi(raw)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BaokuanStudio"
 
@@ -460,25 +657,22 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": f"bad json: {e}"})
             return
 
-        topic = (req.get("topic") or "").strip()
-        key = (req.get("key") or "").strip() or CONFIG_KEY
-        model = (req.get("model") or "").strip() or CONFIG_MODEL
-        api = (req.get("api") or "").strip() or CONFIG_API
+        topic = (req.get("素材") or req.get("topic") or "").strip()
+        mode = (req.get("模式") or req.get("mode") or "原创").strip()
+        style_keys = req.get("写法") or req.get("styles") or list(STYLES.keys())
         mock = bool(req.get("mock")) or SERVER_MOCK
         if not topic:
             self._send(400, {"error": "素材不能为空"})
             return
-        if not mock and not key:
-            self._send(400, {"error": "没有 API key（或用 --mock 模式试界面）"})
-            return
         try:
-            l1 = run_l1(topic, key, model, api, mock)
-            l2 = run_l2(topic, l1, key, model, api, mock)
-            l3 = run_l3(topic, l1, l2, req.get("platform", "小红书"), key, model, api, mock)
-            body_xhs = (l3.get("小红书") or {}).get("正文", "")
-            l4 = run_l4(body_xhs, key, model, api, mock)
-            l5 = run_l5(topic, l1, l2, l3, mock)
-            self._send(200, {"ok": True, "l1": l1, "l2": l2, "l3": l3, "l4": l4, "l5": l5})
+            versions = run_multi(topic, mode, style_keys, mock)
+            checked = {}
+            for k, v in versions.items():
+                rep = scan_l4(v.get("正文", ""))
+                rep["AI味"] = scan_ai(v.get("正文", ""))
+                checked[k] = {"通过": rep["通过"], "字数": rep["字数"],
+                              "口语词": rep["AI味"]["口语词"], "像真人": rep["AI味"]["像真人"]}
+            self._send(200, {"ok": True, "versions": versions, "质检": checked})
         except ModelError as e:
             self._send(502, {"error": str(e)})
         except Exception as e:
