@@ -39,6 +39,14 @@ CONFIG_API = os.environ.get("DEEPSEEK_API", "").strip() or CONFIG.get("api", DEF
 # 双模型分工：writer 负责写稿，polisher 负责改语气和其余环节
 CONFIG_WRITER = CONFIG.get("writer") or {"key": CONFIG_KEY, "api": CONFIG_API, "model": CONFIG_MODEL}
 CONFIG_POLISHER = CONFIG.get("polisher") or {"key": CONFIG_KEY, "api": CONFIG_API, "model": CONFIG_MODEL}
+CONFIG_REVIEWER = CONFIG.get("reviewer") or {"key": CONFIG_KEY, "api": CONFIG_API, "model": CONFIG_MODEL}
+# 云端审核模型（Kimi）从环境变量读，避免 key 写进仓库
+if os.environ.get("REVIEWER_KEY", "").strip():
+    CONFIG_REVIEWER = {
+        "key": os.environ.get("REVIEWER_KEY", "").strip(),
+        "api": os.environ.get("REVIEWER_API", "").strip() or "https://api.moonshot.cn/v1/chat/completions",
+        "model": os.environ.get("REVIEWER_MODEL", "").strip() or "kimi-k3",
+    }
 # 访问码：公开到公网时设置，防止别人白用你的额度
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "").strip()
 
@@ -619,6 +627,44 @@ def run_multi(topic, mode, style_keys, mock=False):
     return parse_multi(raw)
 
 
+def k3_review(versions, mock=False):
+    """K3 通顺审核：把不通顺、读不懂的句子改通顺。失败就原样返回，绝不报错。"""
+    if not versions or mock:
+        return versions, False
+    keys = [k for k in versions.keys() if (versions[k].get("正文") or "").strip()]
+    if not keys:
+        return versions, False
+    blocks = "\n\n".join(f"【{k}】\n{versions[k]['正文']}" for k in keys)
+    w = CONFIG_REVIEWER
+    prompt = f"""下面是几段小红书文案。逐段重写，只做一件事：把不通顺、读不懂、拗口的句子改得通顺、好懂。
+
+硬要求：
+- 只改通顺度和可读性。观点、事实、数字、语气、口语感、结构一律不动。
+- 一段里如果本来就通顺，就原样保留，别乱改。
+- 不要加新信息，不要删原有信息。
+
+输出格式：每段先写【标签】再写改好的正文，标签和原文一致。
+
+{blocks}"""
+    try:
+        raw = call_model([{"role": "system", "content": "你是文案编辑，只做润色，不改内容。"},
+                          {"role": "user", "content": prompt}],
+                         w["key"], w["model"], w["api"], want_json=False, temperature=0.3)
+    except Exception:
+        return versions, False
+    reviewed = {}
+    for m in re.finditer(r"【(.+?)】\s*(.*?)(?=\n【|\Z)", raw or "", re.S):
+        reviewed[m.group(1).strip()] = m.group(2).strip()
+    if not reviewed:
+        return versions, False
+    changed = False
+    for k in keys:
+        if k in reviewed and reviewed[k] and reviewed[k] != versions[k].get("正文", ""):
+            versions[k]["正文"] = reviewed[k]
+            changed = True
+    return versions, changed
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BaokuanStudio"
 
@@ -681,13 +727,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             versions = run_multi(topic, mode, style_keys, mock)
+            review_on = req.get("审核", True) not in (False, "false", 0, "0", "no", "否")
+            reviewed = False
+            if review_on and not mock:
+                versions, reviewed = k3_review(versions, mock)
             checked = {}
             for k, v in versions.items():
                 rep = scan_l4(v.get("正文", ""))
                 rep["AI味"] = scan_ai(v.get("正文", ""))
                 checked[k] = {"通过": rep["通过"], "字数": rep["字数"],
                               "口语词": rep["AI味"]["口语词"], "像真人": rep["AI味"]["像真人"]}
-            self._send(200, {"ok": True, "versions": versions, "质检": checked})
+            self._send(200, {"ok": True, "versions": versions, "质检": checked, "已审核": reviewed})
         except ModelError as e:
             self._send(502, {"error": str(e)})
         except Exception as e:
