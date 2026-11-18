@@ -250,6 +250,7 @@ function render(d){
     if(v.封面大字)h+=`<div class="copybox" style="font-weight:600;font-size:16px">${esc(v.封面大字)}</div>`;
     h+=`<div class="copybox">${esc(v.正文||"")}</div>`;
     if(v.标签)h+=`<p class="lbl">${esc(v.标签)}</p>`;
+    if(v.配图剪辑)h+=`<div class="copybox" style="border-left:3px solid var(--accent);font-size:13px;color:var(--ink-2)">🎬 配图/剪辑：${esc(v.配图剪辑)}</div>`;
     h+=`<p class="meta">${dot} · ${q.字数||0}字</p></div>`;
   }
   if(!Object.keys(versions).length)h=`<div class="card"><p class="lbl">没有生成内容。</p></div>`;
