@@ -673,6 +673,7 @@ def k3_review(versions, mock=False):
 - 只删「重复和口水」，不能删掉任何一个信息点。
 - 一段里如果本来就通顺也不啰嗦，就原样保留，别乱改。
 - ** 加粗标记要原样保留。
+- 【】占位符（如【小学】【某公办】【名字】）是待补的真实信息，必须原样保留，绝不留空、不删除、不改成具体名字或数字。
 
 输出格式：每段先写【标签】再写改好的正文，标签和原文一致。
 
@@ -685,7 +686,9 @@ def k3_review(versions, mock=False):
         return versions, False
     reviewed = {}
     for m in re.finditer(r"【(.+?)】\s*(.*?)(?=\n【|\Z)", raw or "", re.S):
-        reviewed[m.group(1).strip()] = m.group(2).strip()
+        k = m.group(1).strip()
+        if k in keys:   # 只认已知写法名，防止【】占位符被误当成标签
+            reviewed[k] = m.group(2).strip()
     if not reviewed:
         return versions, False
     changed = False
