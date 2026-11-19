@@ -749,7 +749,7 @@ def add_manual(url, title, likes=0):
             "url": (url or "").strip(), "first_seen": datetime.date.today().isoformat(),
             "theme": th, "hook": hk, "manual": True}
     lib.insert(0, item)
-    lib.sort(key=lambda x: -x.get("likes", 0))
+    lib.sort(key=lambda x: (0 if x.get("manual") else 1, -x.get("likes", 0)))
     lf.write_text(json.dumps(lib, ensure_ascii=False, indent=1), encoding="utf-8")
     return item, True
 
