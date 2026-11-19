@@ -85,6 +85,10 @@
   .scard.sel .sname{color:var(--accent-deep)}
   .scard .sdesc{font-size:12px;color:var(--ink-2)}
 
+  .distill{display:inline-block;background:#f5e9cc;color:#8a6420;border:1px solid #e8d5a0;border-radius:4px;padding:0 6px;font-size:11px;font-weight:500;margin-left:6px;vertical-align:1px}
+  [data-theme="dark"] .distill{background:#3a2f1a;color:#d9b56a;border-color:#5a4a26}
+
+
   .lbl{font-size:12px;color:var(--ink-2);margin:0}
 
   .vcard{
@@ -193,6 +197,10 @@ const STYLE_INFO={
   "共情型":"先安抚再讲道理",
   "短打型":"60秒口播稿，发视频号",
 };
+const STYLE_BADGE={
+  "分析型":"nikkie妈蒸馏版",
+  "立场型":"nikkie妈蒸馏版",
+};
 const EXAMPLE="家长说给孩子报了一年两万的英语班，成绩没变化，怀疑被割了韭菜";
 let curTheme="全部", LIB=[], mode="原创";
 const selected=new Set(["干货型"]);
@@ -231,7 +239,8 @@ document.querySelectorAll("nav button[data-s]").forEach(b=>b.onclick=()=>{
   Object.entries(STYLE_INFO).forEach(([s,desc])=>{
     const d=document.createElement("div");
     d.className="scard"+(selected.has(s)?" sel":"");
-    d.innerHTML=`<div class="sname">${s}</div><div class="sdesc">${desc}</div>`;
+    const b=STYLE_BADGE[s]?`<span class="distill">${STYLE_BADGE[s]}</span>`:"";
+    d.innerHTML=`<div class="sname">${s} ${b}</div><div class="sdesc">${desc}</div>`;
     d.onclick=()=>{selected.has(s)?selected.delete(s):selected.add(s);d.classList.toggle("sel");};
     box.appendChild(d);
   });
@@ -283,7 +292,8 @@ function render(d){
     if(!v)continue;
     const q=qc[k]||{};
     const dot=q.像真人?'<span class="ok">✓ 可用</span>':'<span class="bad">建议改改</span>';
-    h+=`<div class="vcard"><span class="tag">${esc(k)}</span><span class="sdesc">${STYLE_INFO[k]}</span> ${cpBtn(v.正文||"")}
+    const bdg=STYLE_BADGE[k]?`<span class="distill">${STYLE_BADGE[k]}</span>`:"";
+    h+=`<div class="vcard"><span class="tag">${esc(k)}</span>${bdg}<span class="sdesc">${STYLE_INFO[k]}</span> ${cpBtn(v.正文||"")}
       <div class="t">${esc(v.标题||"")}</div>`;
     if(v.封面大字)h+=`<div class="copybox" style="font-weight:600;font-size:16px">${esc(v.封面大字)}</div>`;
     h+=`<div class="copybox">${mdBold(v.正文||"")}</div>`;
