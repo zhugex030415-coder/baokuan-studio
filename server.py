@@ -12,6 +12,7 @@ L1 选题 → L2 钩子 → L3 结构 → L4 去AI味 → L5 复盘，由模型�
 """
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -693,6 +694,66 @@ def k3_review(versions, mock=False):
     return versions, changed
 
 
+# ---------------------------------------------------------------- 手动加素材
+TAG_THEMES = ["自然拼读", "单词记忆", "语法", "阅读", "考试备考", "启蒙方法", "长沙本地", "其他"]
+TAG_HOOKS = ["反常识", "清单干货", "故事", "对比", "避坑", "揭秘", "其他"]
+
+
+def tag_one(title):
+    """给单条标题打主题+钩子，失败返回其他。"""
+    w = CONFIG_POLISHER
+    prompt = (
+        "给这条小红书标题打两个标签，只能从选项里选。\n"
+        f"主题：{'、'.join(TAG_THEMES)}\n钩子：{'、'.join(TAG_HOOKS)}\n"
+        "主题规则：发音/音标/拼读→自然拼读；记单词/背单词→单词记忆；语法/时态/句型→语法；"
+        "原版书/分级/绘本→阅读；KET/PET/FCE/考试→考试备考；启蒙/磨耳朵/动画儿歌→启蒙方法；"
+        "长沙政策/学校/择校→长沙本地；都不沾→其他。\n"
+        "钩子规则：反常理→反常识；合集/完整版/N个→清单干货；讲一个学生或家长的故事→故事；"
+        "对比/算账→对比；劝退/别再/千万别→避坑；内幕/真相→揭秘；都不沾→其他。\n\n"
+        f"标题：{title}\n\n只输出 JSON：{{\"theme\":\"...\",\"hook\":\"...\"}}"
+    )
+    try:
+        raw = call_model([{"role": "user", "content": prompt}],
+                         w["key"], w["model"], w["api"], want_json=True, temperature=0)
+        d = json.loads(raw) if isinstance(raw, str) else raw
+        th = str(d.get("theme", "")).strip()
+        hk = str(d.get("hook", "")).strip()
+        return (th if th in TAG_THEMES else "其他", hk if hk in TAG_HOOKS else "其他")
+    except Exception:
+        return ("其他", "其他")
+
+
+def add_manual(url, title, likes=0):
+    """手动加一条素材：链接 + 标题（小红书链接抓不到标题，标题必填）。"""
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("标题不能为空：小红书链接抓不到标题，请把标题也贴上")
+    lib = []
+    lf = ROOT / "library.json"
+    if lf.exists():
+        try:
+            lib = json.loads(lf.read_text(encoding="utf-8"))
+        except Exception:
+            lib = []
+    nk = re.sub(r"[\s\u3000]+", "", title)
+    for i in lib:
+        if re.sub(r"[\s\u3000]+", "", i.get("title", "")) == nk:
+            return i, False    # 已存在
+    th, hk = tag_one(title)
+    try:
+        likes = int(likes or 0)
+    except Exception:
+        likes = 0
+    item = {"title": title, "likes": likes, "collected": 0,
+            "board": "长沙本地" if th == "长沙本地" else "英语学习",
+            "url": (url or "").strip(), "first_seen": datetime.date.today().isoformat(),
+            "theme": th, "hook": hk, "manual": True}
+    lib.insert(0, item)
+    lib.sort(key=lambda x: -x.get("likes", 0))
+    lf.write_text(json.dumps(lib, ensure_ascii=False, indent=1), encoding="utf-8")
+    return item, True
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BaokuanStudio"
 
@@ -733,7 +794,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, f.read_bytes(), ctype)
 
     def do_POST(self):
-        if self.path != "/api/run":
+        if self.path not in ("/api/run", "/api/add"):
             self._send(404, {"error": "not found"})
             return
         if not self._auth():
@@ -744,6 +805,14 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(self.rfile.read(n).decode("utf-8"))
         except Exception as e:
             self._send(400, {"error": f"bad json: {e}"})
+            return
+
+        if self.path == "/api/add":
+            try:
+                item, added = add_manual(req.get("url", ""), req.get("title", ""), req.get("likes", 0))
+                self._send(200, {"ok": True, "item": item, "added": added})
+            except Exception as e:
+                self._send(400, {"error": str(e)})
             return
 
         topic = (req.get("素材") or req.get("topic") or "").strip()
