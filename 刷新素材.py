@@ -60,10 +60,9 @@ BATCH_SIZE = 6    # 每批关键词数，小批更不容易触发安全验证
 BATCH_SLEEP = 30  # 批间停顿（秒），给人工过验证留时间
 PER_RUN = 6       # 每板块每次轮换抓几个词（合计 12 个，接近账号单次上限）
 
-THEMES = ["单词记忆", "自然拼读", "语法", "听力", "口语", "阅读·原版书", "写作",
-          "KET·PET", "启蒙方法", "动画·儿歌", "学习习惯", "选课·选班",
-          "择校", "政策", "分班", "学校", "其他"]
-HOOKS = ["反常识", "划线", "劝退", "揭秘", "对比", "算账", "自检", "清单干货", "故事亲历", "其他"]
+# 干净的两维标签：主题（内容方向）+ 钩子（为什么能爆）
+THEMES = ["自然拼读", "单词记忆", "语法", "阅读", "考试备考", "启蒙方法", "长沙本地", "其他"]
+HOOKS = ["反常识", "清单干货", "故事", "对比", "避坑", "揭秘", "其他"]
 
 
 def parse_num(s):
@@ -127,23 +126,33 @@ def load_rows():
     return rows
 
 
-def tag_batch(titles):
-    """用 DeepSeek 给一批标题打「主题 / 钩子」标签。"""
-    if not KEY:
+def _tag_chunk(titles):
+    """给一小批标题打标签（主题 + 钩子），只接受白名单内的值。"""
+    if not titles or not KEY:
         return {}
-    prompt = ("下面是小红书教育类标题。给每条打两个标签。\n"
-              "主题从这些里选一个：%s\n"
-              "钩子类型从这些里选一个：%s\n\n" % ("、".join(THEMES), "、".join(HOOKS)))
+    prompt = (
+        "给下面每条小红书标题打两个标签，只能从给定选项里选。\n"
+        f"主题：{'、'.join(THEMES)}\n"
+        f"钩子：{'、'.join(HOOKS)}\n"
+        "主题规则：发音/音标/拼读规则→自然拼读；记单词/背单词→单词记忆；"
+        "语法/时态/句型→语法；原版书/分级/绘本/阅读→阅读；KET/PET/FCE/剑桥/考试→考试备考；"
+        "启蒙路线/磨耳朵/动画儿歌→启蒙方法；长沙政策/学校/择校→长沙本地；都不沾→其他。\n"
+        "钩子规则：反常理→反常识；合集/完整版/N个/保姆级→清单干货；讲一个学生或家长的故事→故事；"
+        "A和B对比/算账→对比；劝退/别再/千万别→避坑；内幕/真相/揭秘→揭秘；都不沾→其他。\n\n"
+    )
     for i, t in enumerate(titles, 1):
         prompt += f"{i}. {t}\n"
-    prompt += ('\n只输出 JSON 数组：[{"i":序号,"theme":"主题","hook":"钩子类型"}]，不要解释。')
-    body = json.dumps({"model": MODEL, "messages": [{"role": "user", "content": prompt}],
-                       "temperature": 0, "response_format": {"type": "json_object"},
-                       "max_tokens": 3000}, ensure_ascii=False).encode("utf-8")
+    prompt += '\n只输出 JSON：{"tags":[{"i":1,"theme":"...","hook":"..."}]}'
+    payload = {"model": MODEL, "messages": [{"role": "user", "content": prompt}],
+               "temperature": 0, "response_format": {"type": "json_object"},
+               "max_tokens": 2000}
+    if "v4-pro" in str(MODEL).lower() or "reasoner" in str(MODEL).lower():
+        payload["reasoning_effort"] = "none"   # 打标签无需深度思考，关掉才快
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(API, data=body, headers={
         "Content-Type": "application/json", "Authorization": f"Bearer {KEY}"})
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
+        with urllib.request.urlopen(req, timeout=120) as r:
             txt = json.loads(r.read().decode("utf-8"))["choices"][0]["message"]["content"]
     except Exception as e:
         print("  [warn] 打标签失败：", e)
@@ -151,23 +160,44 @@ def tag_batch(titles):
     try:
         obj = json.loads(txt)
     except Exception:
-        # 兜底：从文本里抠数组
-        m = re.search(r"\[.*\]", txt, re.S)
+        m = re.search(r"\{.*\}", txt, re.S)
         if not m:
             return {}
-        obj = json.loads(m.group(0))
-    # 兼容 {"result":[...]} 或直接 [...]
-    arr = obj.get("result", obj) if isinstance(obj, dict) else obj
-    if isinstance(arr, dict):
-        arr = list(arr.values())[0] if arr else []
+        try:
+            obj = json.loads(m.group(0))
+        except Exception:
+            return {}
+    arr = obj.get("tags") if isinstance(obj, dict) else None
+    if not isinstance(arr, list):
+        arr = obj.get("result") if isinstance(obj, dict) else None
+    if not isinstance(arr, list) and isinstance(obj, dict):
+        for v in obj.values():
+            if isinstance(v, list):
+                arr = v
+                break
+    if not isinstance(arr, list):
+        return {}
     out = {}
     for it in arr:
-        if isinstance(it, dict) and "i" in it:
-            idx = it["i"]
-            if isinstance(idx, str) and idx.isdigit():
-                idx = int(idx)
-            if isinstance(idx, int) and 1 <= idx <= len(titles):
-                out[titles[idx - 1]] = (it.get("theme", "其他"), it.get("hook", "其他"))
+        if not isinstance(it, dict):
+            continue
+        idx = it.get("i")
+        if isinstance(idx, str) and idx.isdigit():
+            idx = int(idx)
+        if not (isinstance(idx, int) and 1 <= idx <= len(titles)):
+            continue
+        th = str(it.get("theme", "")).strip()
+        hk = str(it.get("hook", "")).strip()
+        out[titles[idx - 1]] = (th if th in THEMES else "其他", hk if hk in HOOKS else "其他")
+    return out
+
+
+def tag_batch(titles, chunk=12):
+    """分批打标签，每批 chunk 条，避免一次太多导致失败。"""
+    out = {}
+    for i in range(0, len(titles), chunk):
+        out.update(_tag_chunk(titles[i:i + chunk]))
+        time.sleep(1)
     return out
 
 
@@ -230,7 +260,7 @@ def main():
     chosen = []
     for b, kws in BOARDS:
         n = len(kws)
-        start = seed % n
+        start = (seed * PER_RUN) % n   # 每天往后挪一整批，避免重叠
         pick = [kws[(start + i) % n] for i in range(PER_RUN)]
         print(f"【{b}】本次：{'、'.join(pick)}", flush=True)
         chosen.extend(pick)
