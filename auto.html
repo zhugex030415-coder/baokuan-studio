@@ -296,7 +296,7 @@ function render(d){
 }
 
 // 雷达
-const THEMES=["全部","自然拼读","单词记忆","语法","阅读","考试备考","启蒙方法","长沙本地","其他"];
+const THEMES=["全部","手动","自然拼读","单词记忆","语法","阅读","考试备考","启蒙方法","长沙本地","其他"];
 function fmt(n){return n>=10000?(n/10000).toFixed(1)+"万":n}
 function renderChips(){
   const box=$("themeChips");box.innerHTML="";
@@ -306,13 +306,17 @@ function renderChips(){
 function renderRadar(){
   const box=$("radarOut");box.innerHTML="";
   const byBoard={};
-  LIB.forEach(it=>{if(curTheme!=="全部"&&(it.theme||"其他")!==curTheme)return;(byBoard[it.board||"综合"]=byBoard[it.board||"综合"]||[]).push(it);});
-  if(!LIB.length){box.innerHTML=`<p class="lbl">素材库是空的，先双击「刷新素材.bat」抓一次。</p>`;return}
+  LIB.forEach(it=>{
+    if(curTheme==="手动"){ if(!it.manual) return; }
+    else if(curTheme!=="全部"&&(it.theme||"其他")!==curTheme) return;
+    (byBoard[it.board||"综合"]=byBoard[it.board||"综合"]||[]).push(it);
+  });
+  if(!Object.keys(byBoard).length){box.innerHTML=`<p class="lbl">这个筛选下没有内容。</p>`;return}
   for(const board in byBoard){
     const h=document.createElement("div");h.className="board-title";h.textContent=`${board}（${byBoard[board].length}）`;box.appendChild(h);
     byBoard[board].forEach(it=>{
       const d=document.createElement("div");d.className="ref";
-      d.innerHTML=`<span class="n">${fmt(it.likes||0)}赞</span><span class="ttl">${esc(it.title)}</span><span class="lbl">改写这篇</span>`;
+      d.innerHTML=`<span class="n">${fmt(it.likes||0)}赞</span>${it.manual?'<span class="lbl" style="color:var(--accent)">手动</span>':''}<span class="ttl">${esc(it.title)}</span><span class="lbl">改写这篇</span>`;
       const a=document.createElement("a");
       if(it.url){a.href=it.url;a.target="_blank";a.textContent="看原文 ↗";}
       d.appendChild(a);
